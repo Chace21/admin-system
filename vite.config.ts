@@ -34,7 +34,6 @@ export default defineConfig(({ mode }) => {
         [env.VITE_API_BASE_URL]: {
           target: 'http://localhost:8080',
           changeOrigin: true,
-          secure: false,
           rewrite: (path) => path.replace(new RegExp('^' + env.VITE_API_BASE_URL), '')
         }
       }
