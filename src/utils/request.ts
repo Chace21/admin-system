@@ -5,12 +5,25 @@ const instance = axios.create({
   timeout: 10 * 1000
 })
 
-instance.interceptors.request.use((config) => {
-  return config
-})
+instance.interceptors.request.use(
+  (config) => {
+    return config
+  },
+  (err) => {
+    return Promise.reject(err)
+  }
+)
 
-instance.interceptors.response.use((response) => {
-  return response
-})
+instance.interceptors.response.use(
+  (response) => {
+    if (response.status !== 200) {
+      return Promise.reject('接口请求失败')
+    }
+    return response
+  },
+  (err) => {
+    return Promise.reject(err)
+  }
+)
 
 export default instance
