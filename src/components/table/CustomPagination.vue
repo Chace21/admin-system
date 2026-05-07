@@ -8,7 +8,9 @@
     :total="total"
     @update:current-page="emit('update:currentPage', $event)"
     @update:page-size="emit('update:pageSize', $event)"
-  />
+  >
+    <slot></slot>
+  </el-pagination>
 </template>
 
 <script setup lang="ts">
@@ -22,8 +24,8 @@ const {
   total = 0,
   pageSize = 10,
   currentPage = 1,
-  pageSizes,
-  layout = 'total, ->, prev, pager, next, jumper'
+  pageSizes = [10, 20, 30, 40, 50, 100],
+  layout = 'total, ->, prev, pager, next, sizes, jumper'
 } = defineProps<PaginationProps>()
 
 const emit = defineEmits<PaginationEmits>()
