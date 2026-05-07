@@ -3,13 +3,12 @@
   "include": ["env.d.ts", "src/**/*", "src/**/*.vue", "auto-imports.d.ts", "components.d.ts"],
   "exclude": ["src/**/__tests__/*"],
   "compilerOptions": {
-    "baseUrl": ".",
     // Extra safety for array and object lookups, but may have false positives.
     "noUncheckedIndexedAccess": true,
 
     // Path mapping for cleaner imports.
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     },
 
     // `vue-tsc --build` produces a .tsbuildinfo file for incremental type-checking.
