@@ -1,139 +1,235 @@
 <template>
-  <div ref="chartRef" class="chart-container" :style="{ height }"></div>
+  <div :id="chartId" class="chart-container"></div>
 </template>
 
 <script setup lang="ts">
+import { handleEmptyValue } from '@/utils/format'
 import * as echarts from 'echarts/core'
 import { BarChart, LineChart } from 'echarts/charts'
-import { TooltipComponent, GridComponent, DataZoomComponent } from 'echarts/components'
+import {
+  TitleComponent,
+  TooltipComponent,
+  GridComponent,
+  LegendComponent,
+  DataZoomComponent
+} from 'echarts/components'
+import { LabelLayout, UniversalTransition } from 'echarts/features'
 import { CanvasRenderer } from 'echarts/renderers'
-import type { BarSeriesOption, LineSeriesOption } from 'echarts/charts'
 import type {
+  // 系列类型的定义后缀都为 SeriesOption
+  BarSeriesOption,
+  LineSeriesOption
+} from 'echarts/charts'
+import type {
+  // 组件类型的定义后缀都为 ComponentOption
+  TitleComponentOption,
   TooltipComponentOption,
   GridComponentOption,
+  LegendComponentOption,
   DataZoomComponentOption
 } from 'echarts/components'
 import type { ComposeOption } from 'echarts/core'
-import { useEChart } from '@/composables/useEChart'
-import {
-  alignBarLineData,
-  createAxisLabelFormatter,
-  createCartesianBaseOption,
-  createDataZoomPreset,
-  mergeChartOption,
-  type AxisValue,
-  type SeriesValue
-} from './utils'
 
+// 通过 ComposeOption 来组合出一个只有必须组件和图表的 Option 类型
 type ECOption = ComposeOption<
   | BarSeriesOption
   | LineSeriesOption
+  | TitleComponentOption
   | TooltipComponentOption
   | GridComponentOption
+  | LegendComponentOption
   | DataZoomComponentOption
 >
 
+// 注册必须的组件
 echarts.use([
+  TitleComponent,
   TooltipComponent,
   GridComponent,
+  LegendComponent,
   DataZoomComponent,
   BarChart,
   LineChart,
+  LabelLayout,
+  UniversalTransition,
   CanvasRenderer
 ])
 
 const {
+  color = [],
+  chartId = 'bar-line-chart',
+  yAxisName = '',
+  unit = '',
+  showTooltip = true,
+  showLegend = true,
   xAxisData = [],
-  barData: sourceBarData = [],
-  lineData: sourceLineData = [],
-  height = '400px',
-  barColor = '#409eff',
-  lineColor = '#ff4949',
-  barAxisName = 'barData',
-  lineAxisName = 'lineData',
-  unit = '人',
-  smooth = false,
-  visibleCount = 6,
-  optionOverrides = {}
+  gridConfig = {},
+  barData = [],
+  lineData = [],
+  zoomEnd = 6
 } = defineProps<{
-  xAxisData?: AxisValue[]
-  barData?: SeriesValue[]
-  lineData?: SeriesValue[]
-  height?: string
-  barColor?: string
-  lineColor?: string
-  barAxisName?: string
-  lineAxisName?: string
+  color?: string[]
+  chartId?: string
+  gridConfig?: GridComponentOption
+  yAxisName?: string
+  showTooltip?: boolean
+  showLegend?: boolean
   unit?: string
-  smooth?: boolean
-  visibleCount?: number
-  optionOverrides?: Partial<ECOption>
+  xAxisData?: Array<string | number>
+  barData?: Array<{ name: string; value: (number | null)[] }>
+  lineData?: Array<{ name: string; value: (number | null)[] }>
+  zoomEnd?: number
 }>()
 
-const chartRef = ref<HTMLElement | null>(null)
+let chartInstance: echarts.ECharts | null
+let resizeObserver: ResizeObserver | null
 
-function getOption(): ECOption {
-  const { axisData, barData, lineData } = alignBarLineData(xAxisData, sourceBarData, sourceLineData)
-  const axisLabelFormatter = createAxisLabelFormatter(unit)
-  const dataZoomPreset = createDataZoomPreset(axisData.length, visibleCount)
+function resizeChart() {
+  if (chartInstance) {
+    chartInstance.resize()
+  }
+}
 
-  const baseOption: ECOption = {
-    ...createCartesianBaseOption({
-      axisData,
-      dataZoomPreset
-    }),
+function renderChart() {
+  // 检查图表容器是否存在
+  const dom = document.getElementById(chartId)
+  if (!dom) return
+
+  // 检查数据是否为空
+  if (xAxisData.length === 0 || barData.length === 0 || lineData.length === 0) return
+
+  // 初始化图表实例
+  if (!chartInstance) {
+    chartInstance = echarts.init(dom)
+  }
+
+  const seriesConfig = generateSeriesOption()
+
+  const option: ECOption = {
+    tooltip: {
+      show: showTooltip,
+      trigger: 'axis',
+      axisPointer: {
+        type: 'shadow'
+      },
+      appendTo: dom,
+      formatter: (params) => {
+        const dataIndex = params[0]?.dataIndex
+        let htmlStr = '<div>' + xAxisData[dataIndex] + '</div>'
+        ;[...barData, ...lineData].forEach((item) => {
+          htmlStr +=
+            '<div class="flex">' +
+            item.name +
+            '<div class="value">' +
+            handleEmptyValue(item.value[dataIndex], '-', unit) +
+            '</div>' +
+            '</div>'
+        })
+        return htmlStr
+      }
+    },
+    grid: {
+      top: '5%',
+      left: '5%',
+      right: '5%',
+      ...gridConfig
+    },
+    legend: {
+      show: showLegend
+    },
+    xAxis: {
+      type: 'category',
+      data: xAxisData
+    },
     yAxis: [
       {
         type: 'value',
-        name: barAxisName,
-        axisLabel: {
-          formatter: axisLabelFormatter
-        }
+        name: yAxisName,
+        alignTicks: true
       },
       {
         type: 'value',
-        name: lineAxisName,
-        axisLabel: {
-          formatter: axisLabelFormatter
-        }
+        name: yAxisName,
+        alignTicks: true
       }
     ],
-    series: [
-      {
-        data: barData,
-        type: 'bar',
-        yAxisIndex: 0,
-        itemStyle: {
-          color: barColor
-        }
-      },
-      {
-        data: lineData,
-        type: 'line',
-        yAxisIndex: 1,
-        smooth,
-        itemStyle: {
-          color: lineColor
-        }
-      }
-    ]
+    series: seriesConfig,
+    dataZoom: {
+      type: 'inside',
+      startValue: Math.max(0, xAxisData.length - zoomEnd),
+      endValue: xAxisData.length - 1
+    }
   }
 
-  return mergeChartOption(baseOption, optionOverrides)
+  chartInstance.setOption(option, true)
+
+  if (!resizeObserver) {
+    resizeObserver = new ResizeObserver(resizeChart)
+    resizeObserver.observe(dom)
+  }
 }
 
-const chartOption = computed(() => getOption())
+function generateSeriesOption() {
+  const barSeriesConfig: BarSeriesOption[] = barData.map((item, index) => {
+    const itemStyle: { color?: string } = {}
+    // 如果传入了颜色数组，就使用数组中的颜色，否则使用默认颜色
+    if (color.length > 0) itemStyle.color = color[index] || color[0]
 
-useEChart({
-  chartRef,
-  getOption: () => chartOption.value,
-  watchSource: chartOption,
-  watchDeep: false
+    return {
+      type: 'bar' as const,
+      name: item.name,
+      data: item.value,
+      yAxisIndex: 0,
+      itemStyle
+    }
+  })
+  const lineSeriesConfig: LineSeriesOption[] = lineData.map((item, index) => {
+    const itemStyle: { color?: string } = {}
+    // 如果传入了颜色数组，就使用数组中的颜色，否则使用默认颜色
+    if (color.length > 0) itemStyle.color = color[index] || color[0]
+
+    return {
+      type: 'line' as const,
+      name: item.name,
+      data: item.value,
+      yAxisIndex: 1,
+      itemStyle
+    }
+  })
+  return [...barSeriesConfig, ...lineSeriesConfig]
+}
+
+watch(
+  () => [xAxisData, barData, lineData],
+  () => {
+    renderChart()
+  }
+)
+
+onMounted(() => {
+  renderChart()
+  window.addEventListener('resize', resizeChart)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', resizeChart)
+  resizeObserver?.disconnect()
+  resizeObserver = null
+  chartInstance?.dispose()
+  chartInstance = null
 })
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .chart-container {
-  width: 100%;
+  height: 400px;
+  :deep(.flex) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    .value {
+      margin-left: 20px;
+    }
+  }
 }
 </style>
