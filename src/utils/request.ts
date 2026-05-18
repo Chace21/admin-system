@@ -19,7 +19,7 @@ instance.interceptors.response.use(
     if (response.status !== 200) {
       return Promise.reject('接口请求失败')
     }
-    return response
+    return response.data
   },
   (err) => {
     return Promise.reject(err)
